@@ -1,0 +1,178 @@
+# rules_example.yaml
+# Add/extend extractors and bid_info_map for different tender types.
+# For each tender, you can keep a separate YAML (e.g., rules_seci_bess.yaml, rules_ntpc_boiler.yaml).
+
+defaults:
+  Project Type: "Standalone BESS"
+  Owner: "SECI"
+  Buying Entity: "KSEBL"
+
+bid_info_map:
+  RfS No.: 'RfS\s*No\.\s*([^\n]+)'
+  Capacity (MW): '(\d+)\s*MW\s*/\s*\d+\s*MWh'
+  Energy (MWh): '\d+\s*MW\s*/\s*(\d+)\s*MWh'
+  Interconnection Voltage: 'Interconnection\s*Voltage.*?(\b110\s*kV\b)'
+  Substation: 'Project-1\s+([^\n]+)\s+\d+\s*kV\s*S/s'
+  District: 'Project-1\s+[^\n]+\s+\d+\s*kV\s*S/s\s+([^\n]+)'
+  Document Fee (INR): 'DOCUMENT\s*FEE.*?Amount:\s*INR\s*([0-9,]+)'
+  Bid Processing Fee: 'Bid\s*Processing\s*Fee.*?Rs\.\s*([0-9,]+)\s*/\s*MW'
+  EMD (INR per MWh): 'EARNEST\s*MONEY\s*DEPOSIT.*?Amount:\s*INR\s*([0-9,]+).*?per\s*MWh'
+  Land (acres): 'Space\s*Available.*?\(\s*in\s*acres\s*\).*?([0-9]+)'
+  Availability (%): 'minimum\s+system\s+availability\s+of\s*([0-9]+)\s*%'
+  RtE (%): 'round[- ]?trip\s+efficiency\s*\(RtE\)\s*of\s*([0-9]+)\s*%'
+  SCD (months): 'Scheduled\s+Commissioning\s+Date.*?(\b15\s+months\b)'
+
+extractors:
+  # Core identity
+  - section: "Project"
+    clause: "Intro"
+    parameter: "Project Type"
+    pattern: "Standalone Battery Energy Storage System|BESS"
+    value_expr: "Standalone BESS"
+  - section: "Project"
+    clause: "Intro"
+    parameter: "Owner / Intermediary"
+    pattern: "Solar Energy Corporation of India|SECI"
+    value_expr: "SECI"
+  - section: "Project"
+    clause: "Intro"
+    parameter: "Buying Entity"
+    pattern: "Kerala State Electricity Board|KSEBL"
+    value_expr: "KSEBL"
+
+  # Capacity
+  - section: "Capacity"
+    clause: "4.1"
+    parameter: "Rated Power"
+    unit: "MW"
+    pattern: "(\d+)\s*MW\s*/\s*\d+\s*MWh"
+    value_expr: "{0}"
+  - section: "Capacity"
+    clause: "4.1"
+    parameter: "Rated Energy"
+    unit: "MWh"
+    pattern: "\d+\s*MW\s*/\s*(\d+)\s*MWh"
+    value_expr: "{0}"
+
+  # Grid/location
+  - section: "Location"
+    clause: "4.4 / 6.6"
+    parameter: "Substation"
+    pattern: "Project-1\s+([^\n]+)\s+\d+\s*kV\s*S/s\s+([^\n]+)"
+    value_expr: "{0}, {1}"
+  - section: "Grid"
+    clause: "7.1"
+    parameter: "Interconnection Voltage"
+    pattern: "Interconnection\s*Voltage.*?(\b110\s*kV\b)"
+    value_expr: "{0}"
+
+  # Land
+  - section: "Land"
+    clause: "6.1"
+    parameter: "Space Available"
+    unit: "acres"
+    pattern: "Space\s*Available.*?\(\s*in\s*acres\s*\).*?([0-9]+)"
+    value_expr: "{0}"
+  - section: "Land"
+    clause: "6.1"
+    parameter: "Land Lease Charge"
+    pattern: "lease.*?INR\s*1\s*per\s*plot"
+    value_expr: "INR 1 per plot per year"
+
+  # Fees
+  - section: "Fees"
+    clause: "Bid Info (F)"
+    parameter: "Document Fee"
+    unit: "INR"
+    pattern: "DOCUMENT\s*FEE.*?Amount:\s*INR\s*([0-9,]+)"
+    value_expr: "{0}"
+  - section: "Fees"
+    clause: "Bid Info (G)"
+    parameter: "Bid Processing Fee"
+    pattern: "Bid\s*Processing\s*Fee.*?Rs\.\s*([0-9,]+)\s*/\s*MW.*?maximum.*?([0-9,]+)"
+    value_expr: "{0}/MW; max {1}"
+
+  # EMD / PBG
+  - section: "EMD"
+    clause: "Bid Info (H)"
+    parameter: "EMD per MWh"
+    unit: "INR"
+    pattern: "EARNEST\s*MONEY\s*DEPOSIT.*?Amount:\s*INR\s*([0-9,]+).*?per\s*MWh"
+    value_expr: "{0}"
+
+  # Bidding
+  - section: "Bidding"
+    clause: "2.1"
+    parameter: "Procedure"
+    pattern: "Single Stage,\s*Two-Envelope"
+    value_expr: "Single Stage, Two-Envelope (Two-bid)"
+  - section: "Bidding"
+    clause: "Bid Info (M)"
+    parameter: "e-Reverse Auction"
+    pattern: "e-Reverse Auction"
+    value_expr: "Yes (to be intimated)"
+
+  # Performance
+  - section: "Performance"
+    clause: "8.1.d.i-ii"
+    parameter: "Availability (annual)"
+    unit: "%"
+    pattern: "minimum\s+system\s+availability\s+of\s*([0-9]+)\s*%"
+    value_expr: "{0}"
+  - section: "Performance"
+    clause: "8.1.d.iii"
+    parameter: "Round-trip Efficiency (monthly AC-AC)"
+    unit: "%"
+    pattern: "round[- ]?trip\s+efficiency\s*\(RtE\)\s*of\s*([0-9]+)\s*%"
+    value_expr: "{0}"
+  - section: "Performance"
+    clause: "8.1.c"
+    parameter: "Operational Cycles"
+    pattern: "1\s+Operational\s+cycle\s+per\s+day"
+    value_expr: "1/day (up to 2/day); 40/month; 400/year"
+
+  # Degradation curve
+  - section: "Degradation"
+    clause: "8.1.d.iv"
+    parameter: "Min. Dispatchable Y1"
+    unit: "% of BoL/COD"
+    pattern: "1\s+([0-9]{2}\.?[0-9]*)\s*%"
+    value_expr: "{0}"
+  - section: "Degradation"
+    clause: "8.1.d.iv"
+    parameter: "Min. Dispatchable Y12"
+    unit: "% of BoL/COD"
+    pattern: "12\s+([0-9]{2}\.?[0-9]*)\s*%"
+    value_expr: "{0}"
+
+  # Commissioning
+  - section: "Commissioning"
+    clause: "9.2(a)"
+    parameter: "SCD"
+    pattern: "Scheduled\s+Commissioning\s+Date.*?15\s+months"
+    value_expr: "15 months from BESPA Effective Date"
+  - section: "Commissioning"
+    clause: "9.1"
+    parameter: "Part-Commissioning"
+    pattern: "minimum.*?50%.*?MWh.*?not more than 3"
+    value_expr: "First ≥50% MWh; ≤3 instalments; SCD unchanged"
+
+  # VGF
+  - section: "VGF"
+    clause: "12(b)"
+    parameter: "VGF per MWh"
+    unit: "Lakh/MWh"
+    pattern: "INR\s*([0-9]+)\s*Lakhs\s*/\s*MWh"
+    value_expr: "{0}"
+  - section: "VGF"
+    clause: "12(b)"
+    parameter: "VGF Cap"
+    unit: "% of capex"
+    pattern: "(\b30%\b)\s*of\s*capital"
+    value_expr: "{0}"
+  - section: "VGF"
+    clause: "12(d)"
+    parameter: "VGF Tranches"
+    pattern: "Disbursement of VGF.*?Upon.*?Financial Closure.*?10.*?COD.*?45.*?1st year.*?15.*?2nd year.*?15.*?3rd year.*?15"
+    flags: ["IGNORECASE","DOTALL"]
+    value_expr: "10/45/15/15/15"
